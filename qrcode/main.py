@@ -26,7 +26,18 @@ GenericImageLocal = TypeVar("GenericImageLocal", bound=BaseImage)
 
 precomputed_qr_blanks: Dict[int, ModulesType] = {}
 
-DEBUG = True
+DEBUG = False
+BGblack = "\x1b[40m"
+BGred = "\x1b[41m"
+BGgreen = "\x1b[42m"
+BGyellow = "\x1b[43m"
+BGblue = "\x1b[44m"
+BGmagenta = "\x1b[45m"
+BGcyan = "\x1b[46m"
+BGwhite = "\x1b[47m"
+reset = "\x1b[0m"
+start_color = BGblue
+
 
 def _check_box_size(size):
     if int(size) <= 0:
@@ -120,11 +131,23 @@ class QRCode(Generic[GenericImage]):
         _check_mask_pattern(pattern)
         self._mask_pattern = pattern
 
+
+    def update_color(self, old_modules, increment):
+        colors = [BGgreen, BGyellow, BGblue, BGmagenta, BGcyan]
+        for r in range(len(self.modules)):
+            for c in range(len(self.modules)):
+                if not self.modules[r][c] and self.modules[r][c] != old_modules[r][c]:
+                    self.mod_colors[r][c] = colors[self.color_counter]
+        if increment: 
+            self.color_counter += 1
+    
     def clear(self):
         """
         Reset the internal data.
         """
         self.modules = [[]]
+        self.mod_colors = [[]]
+        self.color_counter = 0
         self.modules_count = 0
         self.data_cache = None
         self.data_list = []
@@ -143,6 +166,7 @@ class QRCode(Generic[GenericImage]):
         elif optimize:
             self.data_list.extend(util.optimal_data_chunks(data, minimum=optimize))
         else:
+            # Adds data as a bytestring I think
             self.data_list.append(util.QRData(data))
         self.data_cache = None
 
@@ -162,7 +186,7 @@ class QRCode(Generic[GenericImage]):
             self.makeImpl(False, self.mask_pattern)
 
     def makeImpl(self, test, mask_pattern):
-        if DEBUG: print("QRCODE.make()")
+        if DEBUG: print("QRCODE.makeImpl()")
         self.modules_count = self.version * 4 + 17
 
         if self.version in precomputed_qr_blanks:
@@ -186,20 +210,24 @@ class QRCode(Generic[GenericImage]):
 
             precomputed_qr_blanks[self.version] = copy_2d_array(self.modules)
 
+        # Track which ones were changed
+        self.mod_colors = [ [None] * self.modules_count for i in range(self.modules_count) ]
+        self.update_color([ [None] * self.modules_count for i in range(self.modules_count) ], True)
+        
+        old_modules = [r[:] for r in self.modules]  
         self.setup_type_info(test, mask_pattern)
+        self.update_color(old_modules, True)
 
         if self.version >= 7:
+            old_modules = [r[:] for r in self.modules]  
             self.setup_type_number(test)
+            self.update_color(old_modules, True)
 
         if self.data_cache is None:
             self.data_cache = util.create_data(
                 self.version, self.error_correction, self.data_list
             )
-        self.print_tty()
-        print("\n\n")
         self.map_data(self.data_cache, mask_pattern)
-        self.print_tty()
-        print("\n\n")
 
     def setup_position_probe_pattern(self, row, col):
         if DEBUG: print("QRCODE.setup_position_probe_pattern()")
@@ -291,15 +319,28 @@ class QRCode(Generic[GenericImage]):
             self.make()
 
         modcount = self.modules_count
-        out.write("\x1b[1;47m" + (" " * (modcount * 2 + 4)) + "\x1b[0m\n")
+        out.write("\x1b[1;47m" + (" " * (modcount * 2 + 4)) + f"{reset}\n")
+        print(f'modules height: {len(self.modules)}')
+        print(f'modules height: {self.modules_count}')
+
         for r in range(modcount):
-            out.write("\x1b[1;47m  \x1b[40m")
+            out.write(f"\x1b[1;47m  {BGblack}")
             for c in range(modcount):
+
                 if self.modules[r][c]:
-                    out.write("  ")
+                    # out.write(f"\x1b[1;47m{BGcyan}")
+                    # if self.mod_colors[r][c] != None:
+                    #     out.write(f"\x1b[1;47m  {self.mod_colors[r][c]}")
+                    # else:
+                    # out.write(" X")
+                    # out.write(f"\x1b[1;47m X{BGblack}")
+                    out.write(f"  ")
                 else:
-                    out.write("\x1b[1;47m  \x1b[40m")
-            out.write("\x1b[1;47m  \x1b[0m\n")
+                    if self.mod_colors[r][c] != None and DEBUG:
+                        out.write(f"\x1b[1;47m  {self.mod_colors[r][c]}")
+                    else:
+                        out.write(f"\x1b[1;47m  {BGblack}")
+            out.write(f"\x1b[1;47m  {reset}\n")
         out.write("\x1b[1;47m" + (" " * (modcount * 2 + 4)) + "\x1b[0m\n")
         out.flush()
 
@@ -496,6 +537,7 @@ class QRCode(Generic[GenericImage]):
         # E TODO: This is where a lot of my work is going to be done maybe
         # or just making my own verion of this 
         if DEBUG: print("QRCODE.map_data()")
+        old_modules = [r[:] for r in self.modules]
 
         inc = -1
         row = self.modules_count - 1
@@ -516,14 +558,17 @@ class QRCode(Generic[GenericImage]):
             while True:
 
                 for c in col_range:
+                    # print(f'col:{col}, c: {c}, row: {row}')
 
                     if self.modules[row][c] is None:
 
                         dark = False
 
+                        # Actually encode the data
                         if byteIndex < data_len:
                             dark = ((data[byteIndex] >> bitIndex) & 1) == 1
 
+                        # Apply the mask
                         if mask_func(row, c):
                             dark = not dark
 
@@ -540,6 +585,8 @@ class QRCode(Generic[GenericImage]):
                     row -= inc
                     inc = -inc
                     break
+
+        self.update_color(old_modules, True)
 
     def get_matrix(self):
         """

@@ -15,7 +15,6 @@ class PyPNGImage(qrcode.image.base.BaseImage):
     needs_drawrect = False
 
     def new_image(self, **kwargs):
-        print("new image")
         return png.Writer(self.pixel_size, self.pixel_size, greyscale=True, bitdepth=1)
 
     def drawrect(self, row, col):

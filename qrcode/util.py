@@ -5,6 +5,9 @@ from typing import List
 from qrcode import LUT, base, exceptions
 from qrcode.base import RSBlock
 
+
+
+
 # QR encoding modes.
 MODE_NUMBER = 1 << 0
 MODE_ALPHA_NUM = 1 << 1
@@ -495,7 +498,7 @@ class BitBuffer:
             self.buffer[buf_index] |= 0x80 >> (self.length % 8)
         self.length += 1
 
-
+# Ethan: Error correction happens here I think 
 def create_bytes(buffer: BitBuffer, rs_blocks: List[RSBlock]):
     offset = 0
 
@@ -546,7 +549,8 @@ def create_bytes(buffer: BitBuffer, rs_blocks: List[RSBlock]):
             if i >= len(ec):
                 break
             data.append(ec[i])
-
+            # data.append(1)
+    # print(f'error correction data: {ecdata}')
     return data
 
 
