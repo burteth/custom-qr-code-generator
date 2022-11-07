@@ -48,7 +48,9 @@ class BasicTestSuite(unittest.TestCase):
 
         # test_string = "https://shiftcreator.space/"
 
-        test_string = "https://shiftcreator.space/" + "?" + str(0b00000000)*200
+        test_string = "https://shiftcreator.space/" + "?" + chr(0b00000000)*200
+        # test_string = "https://shiftcreator.space/" + "?" + chr(0)*100
+        # test_string = chr(0b00000000)*200
         output_file = "./tests/tmp/test_simple.png"
 
         for i in range(1):
@@ -63,10 +65,10 @@ class BasicTestSuite(unittest.TestCase):
             qr.add_data(test_string)
             qr.print_tty()
 
-        # # Save the image in the tmp folder
-        # img = qr.make_image()
-        # with open(output_file, 'wb') as my_file:
-        #     img.save(my_file)
+            # # Save the image in the tmp folder
+            img = qr.make_image()
+            with open(output_file, 'wb') as my_file:
+                img.save(my_file)
 
         # # Retrive the encoded data
         # encoded_data = read_qr_code(output_file) 
